@@ -6,12 +6,13 @@ plugins {
 
 android {
     namespace = "com.pyth0nkod3r.fabricfocus"
-    compileSdk = 35
+    // Kept at API 33 to match the Android SDK installed in Android Code Studio.
+    compileSdk = 33
 
     defaultConfig {
         applicationId = "com.pyth0nkod3r.fabricfocus"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 33
         versionCode = 1
         versionName = "0.1.0"
     }
