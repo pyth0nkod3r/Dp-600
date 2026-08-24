@@ -14,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -91,7 +92,7 @@ private fun PracticeScreen(repo: StudyRepository) {
     var selection by rememberSaveable { mutableStateOf<String?>(null) }
     var submitted by rememberSaveable { mutableStateOf(false) }
     val question = remember(offset) { repo.question(offset) }
-    val choices = remember(question?.id) { question?.let(repo::choices).orEmpty() }
+    val choices = remember(question?.id) { question?.let { repo.choices(it.id) }.orEmpty() }
     val images = remember(question?.id) { question?.let { repo.images(it.id, "question") }.orEmpty() }
     if (question == null) { EmptyState("You reached the end", "Start a new study session to review questions again."); return }
     LazyColumn(Modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
