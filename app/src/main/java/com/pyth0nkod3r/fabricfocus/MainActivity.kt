@@ -93,47 +93,28 @@ private fun PracticeScreen(repo: StudyRepository, topicFilter: String? = null, c
     var selection by rememberSaveable { mutableStateOf<String?>(null) }
     var submitted by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(topicFilter) { offset = 0; selection = null; submitted = false }
+
     val question = remember(offset, topicFilter) { repo.question(offset, topicFilter) }
     val choices = remember(question?.id) { question?.let { repo.choices(it.id) }.orEmpty() }
     val images = remember(question?.id) { question?.let { repo.images(it.id, "question") }.orEmpty() }
-    // DnD/HOTSPOT question detection: exactly 1 option with stub text
-    val isDndQuestion = choices.size == 1 && choices[0].text == "See Explanation section for answer."
     if (question == null) { EmptyState("You reached the end", "Start a new study session to review questions again."); return }
-    // Remember which DnD question index we've already seen explanation for
-    var dndSeen by rememberSaveable { mutableSetOf<Int>() }
+
+    val isMultipleChoice = choices.size >= 2
     LazyColumn(Modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         item {
-            Row(verticalAlignment = Alignment.CenterVertically) { AssistChip(onClick = {}, label = { Text(question.topic) }); if (topicFilter != null) { Spacer(Modifier.width(8.dp)); AssistChip(onClick = clearFilter, label = { Text("✕ $topicFilter") }) }; Spacer(Modifier.width(8.dp)); Text("Question ${offset + 1}", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                AssistChip(onClick = {}, label = { Text(question.topic) })
+                if (topicFilter != null) { Spacer(Modifier.width(8.dp)); AssistChip(onClick = clearFilter, label = { Text("✕ $topicFilter") }) }
+                Spacer(Modifier.width(8.dp))
+                Text("Question ${offset + 1}", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
             Spacer(Modifier.height(12.dp))
-            // For DnD questions, show question text + images + explanation button
-            // For regular questions, show question text + choices
-            if (isDndQuestion) {
-                Column(horizontalAlignment = Alignment.Start, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(question.text, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-                    if (images.isNotEmpty()) {
-                        images.forEach { image ->
-                            AsyncImage(model = "file:///android_asset/" + image.path.removePrefix("assets"), contentDescription = "Question diagram", modifier = Modifier.fillMaxWidth().heightIn(max = 360.dp))
-                        }
-                    }
-                    if (!dndSeen.contains(offset)) {
-                        Button(onClick = { dndSeen += offset }) {
-                            Text("Show explanation", style = MaterialTheme.typography.bodyLarge)
-                        }.modifier(Modifier.padding(top = 8.dp))
-                    }
-                }
-            } else {
-                Row(verticalAlignment = Alignment.CenterVertically) { AssistChip(onClick = {}, label = { Text(question.topic) }); if (topicFilter != null) { Spacer(Modifier.width(8.dp)); AssistChip(onClick = clearFilter, label = { Text("✕ $topicFilter") }) }; Spacer(Modifier.width(8.dp)); Text("Question ${offset + 1}", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                Spacer(Modifier.height(12.dp))
-                Text(question.text, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-            }
+            Text(question.text, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
         }
-        // For DnD questions, show explanation card instead of answer choices
-        if (isDndQuestion && dndSeen.contains(offset)) {
-            ExplanationCard(question.explanation, repo.images(question.id, "explanation"))
-        } else if (!isDndQuestion) {
-            if (images.isNotEmpty()) item {
-                images.forEach { image -> AsyncImage(model = "file:///android_asset/" + image.path.removePrefix("assets"), contentDescription = "Question diagram", modifier = Modifier.fillMaxWidth().heightIn(max = 360.dp)) }
-            }
+        if (images.isNotEmpty()) item {
+            images.forEach { image -> AsyncImage(model = "file:///android_asset/" + image.path.removePrefix("assets/"), contentDescription = "Question diagram", modifier = Modifier.fillMaxWidth().heightIn(max = 360.dp)) }
+        }
+        if (isMultipleChoice) {
             items(choices) { choice ->
                 val isSelected = selection == choice.key
                 val isCorrect = submitted && choice.isCorrect
@@ -144,15 +125,14 @@ private fun PracticeScreen(repo: StudyRepository, topicFilter: String? = null, c
                 }
             }
         }
+        if (submitted && !isMultipleChoice) item { ExplanationCard(question.explanation, repo.images(question.id, "explanation")) }
         item {
-            Button(onClick = { if (submitted) { offset++; selection = null; submitted = false; dndSeen.clear() } else submitted = true }, enabled = if (isDndQuestion) dndSeen.contains(offset) || !isDndQuestion else selection != null || submitted, modifier = Modifier.fillMaxWidth().height(54.dp)) {
-                Text(if (submitted) "Next question" else if (isDndQuestion && !dndSeen.contains(offset)) "Show explanation" else "Check answer")
-            }
-            if (isDndQuestion && submitted && dndSeen.contains(offset)) {
-                AnimatedVisibility(true) { ExplanationCard(question.explanation, repo.images(question.id, "explanation")) }
-            } else if (submitted && !isDndQuestion) {
-                AnimatedVisibility(submitted) { ExplanationCard(question.explanation, repo.images(question.id, "explanation")) }
-            }
+            Button(
+                onClick = { if (submitted) { offset++; selection = null; submitted = false } else submitted = true },
+                enabled = !isMultipleChoice || selection != null || submitted,
+                modifier = Modifier.fillMaxWidth().height(54.dp)
+            ) { Text(if (submitted) "Next question" else if (isMultipleChoice) "Check answer" else "Show explanation") }
+            if (submitted && isMultipleChoice) AnimatedVisibility(true) { ExplanationCard(question.explanation, repo.images(question.id, "explanation")) }
         }
     }
 }
