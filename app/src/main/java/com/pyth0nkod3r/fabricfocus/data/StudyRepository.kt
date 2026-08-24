@@ -21,11 +21,12 @@ class StudyRepository(private val context: Context) {
     }
 
     fun dashboard(): Dashboard = db().use { db ->
-        val total = db.rawQuery("SELECT COUNT(*) FROM questions", null).use { it.moveToFirst(); it.getInt(0) }
+        val total = db.rawQuery("SELECT COUNT(*) FROM questions q WHERE (SELECT COUNT(*) FROM options o WHERE o.question_id=q.id) >= 2", null).use { it.moveToFirst(); it.getInt(0) }
         val images = db.rawQuery("SELECT COUNT(*) FROM images", null).use { it.moveToFirst(); it.getInt(0) }
         val topics = db.rawQuery("""
             SELECT COALESCE(t.name, 'General'), COUNT(q.id)
             FROM questions q LEFT JOIN topics t ON t.id=q.topic_id
+            WHERE (SELECT COUNT(*) FROM options o WHERE o.question_id=q.id) >= 2
             GROUP BY t.name ORDER BY COUNT(q.id) DESC
         """.trimIndent(), null).use { c ->
             buildList { while (c.moveToNext()) add(TopicStat(c.getString(0), c.getInt(1))) }
@@ -33,12 +34,16 @@ class StudyRepository(private val context: Context) {
         Dashboard(total, images, topics)
     }
 
-    fun question(offset: Int = 0): Question? = db().use { db ->
-        db.rawQuery("""
+    fun question(offset: Int = 0, topic: String? = null): Question? = db().use { db ->
+        val sql = """
             SELECT q.id, COALESCE(t.name,'General'), q.question_text, COALESCE(q.explanation,'')
             FROM questions q LEFT JOIN topics t ON t.id=q.topic_id
+            WHERE (SELECT COUNT(*) FROM options o WHERE o.question_id=q.id) >= 2
+            ${if (topic != null) "AND COALESCE(t.name,'General')=?" else ""}
             ORDER BY q.id LIMIT 1 OFFSET ?
-        """.trimIndent(), arrayOf(offset.toString())).use { c ->
+        """.trimIndent()
+        val args = if (topic != null) arrayOf(topic, offset.toString()) else arrayOf(offset.toString())
+        db.rawQuery(sql, args).use { c ->
             if (!c.moveToFirst()) null else Question(c.getLong(0), c.getString(1), c.getString(2), c.getString(3))
         }
     }
@@ -50,7 +55,7 @@ class StudyRepository(private val context: Context) {
     }
 
     fun images(questionId: Long, role: String? = null): List<QuestionImage> = db().use { db ->
-        val sql = "SELECT i.local_path, qi.role FROM question_images qi JOIN images i ON i.id=qi.image_id WHERE qi.question_id=?" + if (role != null) " AND qi.role=?" else "" + " ORDER BY qi.sort_order"
+        val sql = "SELECT i.local_path, qi.role FROM question_images qi JOIN images i ON i.id=qi.image_id WHERE qi.question_id=?" + (if (role != null) " AND qi.role=?" else "") + " ORDER BY qi.sort_order"
         val args = if (role == null) arrayOf(questionId.toString()) else arrayOf(questionId.toString(), role)
         db.rawQuery(sql, args).use { c -> buildList { while (c.moveToNext()) add(QuestionImage(c.getString(0), c.getString(1))) } }
     }

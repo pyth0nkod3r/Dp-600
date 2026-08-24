@@ -36,6 +36,7 @@ private enum class Tab(val label: String) { Home("Home"), Practice("Practice"), 
 @Composable
 private fun FabricFocusApp(repo: StudyRepository) {
     var tab by rememberSaveable { mutableStateOf(Tab.Home) }
+    var practiceTopic by rememberSaveable { mutableStateOf<String?>(null) }
     Scaffold(
         bottomBar = {
             NavigationBar {
@@ -47,8 +48,8 @@ private fun FabricFocusApp(repo: StudyRepository) {
     ) { padding ->
         Box(Modifier.padding(padding).fillMaxSize()) {
             when (tab) {
-                Tab.Home -> HomeScreen(repo, { tab = Tab.Practice })
-                Tab.Practice -> PracticeScreen(repo)
+                Tab.Home -> HomeScreen(repo, startPractice = { practiceTopic = null; tab = Tab.Practice }, exploreTopic = { practiceTopic = it; tab = Tab.Practice })
+                Tab.Practice -> PracticeScreen(repo, topicFilter = practiceTopic, clearFilter = { practiceTopic = null })
                 Tab.Review -> ReviewScreen(repo)
                 Tab.Progress -> ProgressScreen(repo)
             }
@@ -57,7 +58,7 @@ private fun FabricFocusApp(repo: StudyRepository) {
 }
 
 @Composable
-private fun HomeScreen(repo: StudyRepository, startPractice: () -> Unit) {
+private fun HomeScreen(repo: StudyRepository, startPractice: () -> Unit, exploreTopic: (String) -> Unit) {
     val dashboard = remember { repo.dashboard() }
     LazyColumn(Modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         item {
@@ -76,7 +77,7 @@ private fun HomeScreen(repo: StudyRepository, startPractice: () -> Unit) {
         item { Text("Study coverage", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold) }
         items(dashboard.topics) { topic ->
             ElevatedCard(shape = RoundedCornerShape(18.dp)) {
-                Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.fillMaxWidth().clickable { exploreTopic(topic.name) }.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Outlined.AccountTree, null, tint = MaterialTheme.colorScheme.secondary)
                     Spacer(Modifier.width(14.dp)); Column(Modifier.weight(1f)) { Text(topic.name, fontWeight = FontWeight.Medium); Text("${topic.questions} questions", style = MaterialTheme.typography.bodySmall) }
                     Text("Explore", color = MaterialTheme.colorScheme.primary)
@@ -87,17 +88,18 @@ private fun HomeScreen(repo: StudyRepository, startPractice: () -> Unit) {
 }
 
 @Composable
-private fun PracticeScreen(repo: StudyRepository) {
+private fun PracticeScreen(repo: StudyRepository, topicFilter: String? = null, clearFilter: () -> Unit = {}) {
     var offset by rememberSaveable { mutableIntStateOf(0) }
     var selection by rememberSaveable { mutableStateOf<String?>(null) }
     var submitted by rememberSaveable { mutableStateOf(false) }
-    val question = remember(offset) { repo.question(offset) }
+    LaunchedEffect(topicFilter) { offset = 0; selection = null; submitted = false }
+    val question = remember(offset, topicFilter) { repo.question(offset, topicFilter) }
     val choices = remember(question?.id) { question?.let { repo.choices(it.id) }.orEmpty() }
     val images = remember(question?.id) { question?.let { repo.images(it.id, "question") }.orEmpty() }
     if (question == null) { EmptyState("You reached the end", "Start a new study session to review questions again."); return }
     LazyColumn(Modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         item {
-            Row(verticalAlignment = Alignment.CenterVertically) { AssistChip(onClick = {}, label = { Text(question.topic) }); Spacer(Modifier.width(8.dp)); Text("Question ${offset + 1}", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            Row(verticalAlignment = Alignment.CenterVertically) { AssistChip(onClick = {}, label = { Text(question.topic) }); if (topicFilter != null) { Spacer(Modifier.width(8.dp)); AssistChip(onClick = clearFilter, label = { Text("✕ $topicFilter") }) }; Spacer(Modifier.width(8.dp)); Text("Question ${offset + 1}", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant) }
             Spacer(Modifier.height(12.dp)); Text(question.text, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
         }
         if (images.isNotEmpty()) item {

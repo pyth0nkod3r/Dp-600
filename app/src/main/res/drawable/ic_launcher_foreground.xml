@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Layered diamond "focus" glyph, kept inside the 66dp adaptive-icon safe zone -->
+    <group
+        android:scaleX="0.7"
+        android:scaleY="0.7"
+        android:pivotX="54"
+        android:pivotY="54">
+        <path
+            android:fillColor="#38BDF8"
+            android:pathData="M54,18 L90,54 L54,90 L18,54 Z" />
+        <path
+            android:fillColor="#101426"
+            android:pathData="M54,34 L76,54 L54,74 L32,54 Z" />
+        <path
+            android:fillColor="#F8FAFC"
+            android:pathData="M54,43 L66,54 L54,65 L42,54 Z" />
+    </group>
+</vector>
